@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>实验二：三维海豚与几何变换</title>
+  <link rel="icon" href="data:,"><link rel="stylesheet" href="style.css">
+  <script src="js/math.js" defer></script>
+  <script src="js/camera.js" defer></script>
+  <script src="js/renderer.js" defer></script>
+  <script src="js/input.js" defer></script>
+  <script src="js/stl.js" defer></script>
+  <script src="js/ui.js" defer></script>
+  <script src="js/loader.js" defer></script>
+  <script src="js/dolphin-app.js" defer></script>
+  <script src="app.js" defer onerror="document.getElementById('status').textContent='app.js加载失败，请将HTML、CSS、JS和js文件夹放在同一目录。'"></script>
+</head>
+<body><main>
+  <h1>实验二：三维海豚与几何变换</h1>
+  <div class="tools">
+    <label>模式 <select id="mode"><option value="local">物体坐标系</option><option value="screen">屏幕坐标系</option></select></label>
+    <button id="reset">重置模型 R</button><button id="reset-view">恢复视角</button>
+    <label>观察 <select id="view"><option value="default">默认视角</option><option value="front">正面</option><option value="right">侧面</option><option value="back">背面</option><option value="top">上方</option><option value="focus">定位模型</option></select></label>
+  </div>
+  <canvas id="canvas" width="1120" height="600" tabindex="0" aria-label="三维模型，导入STL后显示；左键拖动Arcball观察，滚轮缩放"></canvas>
+  <p id="status" role="status">正在初始化…</p>
+  <div id="actions" class="tools" aria-label="当前模式操作，按钮支持长按"></div>
+  <p id="keys"></p>
+  <details><summary>辅助显示与STL</summary>
+    <div class="tools">
+      <label><input type="checkbox" data-option="world" checked>世界轴</label><label><input type="checkbox" data-option="local" checked>局部轴</label><label><input type="checkbox" data-option="trail" checked>轨迹</label><label><input type="checkbox" data-option="grid" checked>网格</label><button id="clear-trail">清除轨迹</button>
+    </div>
+    <p>X红、Y绿、Z蓝。</p>
+    <div class="tools"><label>导入STL <input id="file" type="file" accept=".stl"></label><span>海豚样例：assets/海豚_ASCII.stl 或 海豚_Binary.stl（含颜色）</span></div>
+  </details>
+  <p id="error" role="alert" hidden></p>
+</main></body></html>
