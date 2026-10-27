@@ -1,10 +1,10 @@
-/* 2. WebGL渲染器：一个Shader程序绘制三角形与参考线；辅助线通过u_unlit跳过光照。 */
+/* 2. WebGL渲染器：一个Shader程序绘制三角形与参考线，直接输出逐面颜色。 */
 (function (global) {
   'use strict';
 
   const isNode = typeof module !== 'undefined' && module.exports;
   const math = isNode ? require('./math.js') : (global.DolphinModules || {}).math;
-  const {mIdentity, mMul, mPoint, mNormal, AXES, add, sub, mul, normalize, cross} = math;
+  const {mIdentity, mMul, mPoint, AXES, add, sub, mul, normalize, cross} = math;
 
   /** 把线段数组转换为 GPU 顶点/颜色数组。 */
   function buildLines(segments) {
@@ -48,8 +48,8 @@
       });
       if (!gl) throw new Error('无法启动WebGL，请开启浏览器硬件加速后刷新。');
 
-      const vertex = `attribute vec3 a_position,a_normal,a_color;uniform mat4 u_mvp;uniform mat3 u_normal;varying vec3 n,c;void main(){gl_Position=u_mvp*vec4(a_position,1.0);n=u_normal*a_normal;c=a_color;}`;
-      const fragment = `precision mediump float;varying vec3 n,c;uniform float u_unlit;void main(){float light=.52+.48*max(dot(normalize(n),normalize(vec3(-.4,.85,.65))),0.0);gl_FragColor=vec4(c*mix(light,1.0,u_unlit),1.0);}`;
+      const vertex = `attribute vec3 a_position,a_color;uniform mat4 u_mvp;varying vec3 c;void main(){gl_Position=u_mvp*vec4(a_position,1.0);c=a_color;}`;
+      const fragment = `precision mediump float;varying vec3 c;void main(){gl_FragColor=vec4(c,1.0);}`;
 
       /** 编译并检查一个 Shader。 */
       const shader = (type, source) => {
@@ -75,12 +75,10 @@
       }
 
       this.loc = {};
-      for (const n of ['position', 'normal', 'color']) {
+      for (const n of ['position', 'color']) {
         this.loc[n] = gl.getAttribLocation(program, 'a_' + n);
       }
-      for (const n of ['mvp', 'normal', 'unlit']) {
-        this.loc['u_' + n] = gl.getUniformLocation(program, 'u_' + n);
-      }
+      this.loc.u_mvp = gl.getUniformLocation(program, 'u_mvp');
 
       this.modelMesh = null;
       this.dynamic = {
@@ -101,11 +99,11 @@
       gl.clearColor(0.975, 0.984, 0.99, 1);
     }
 
-    /** 上传网格的位置/法线/颜色并返回缓冲信息。 */
+    /** 上传网格的位置/颜色并返回缓冲信息。 */
     upload(mesh) {
       const gl = this.gl;
       const out = {count: mesh.positions.length / 3};
-      for (const n of ['position', 'normal', 'color']) {
+      for (const n of ['position', 'color']) {
         const data = mesh[n + 's'];
         if (data) {
           out[n] = gl.createBuffer();
@@ -120,15 +118,15 @@
     setModel(mesh) {
       const next = this.upload(mesh);
       if (this.modelMesh) {
-        for (const n of ['position', 'normal', 'color']) {
+        for (const n of ['position', 'color']) {
           if (this.modelMesh[n]) this.gl.deleteBuffer(this.modelMesh[n]);
         }
       }
       this.modelMesh = next;
     }
 
-    /** 用指定矩阵绘制模型或线段。 */
-    draw(mesh, matrix, vp, lines = false, mode = this.gl.LINES) {
+    /** 用指定矩阵和图元模式绘制网格。 */
+    draw(mesh, matrix, vp, mode = this.gl.TRIANGLES) {
       const gl = this.gl;
       const loc = this.loc;
       gl.useProgram(this.program);
@@ -139,30 +137,19 @@
         gl.vertexAttribPointer(loc[n], 3, gl.FLOAT, false, 0, 0);
       }
 
-      if (lines) {
-        gl.disableVertexAttribArray(loc.normal);
-        gl.vertexAttrib3f(loc.normal, 0, 1, 0);
-      } else {
-        gl.bindBuffer(gl.ARRAY_BUFFER, mesh.normal);
-        gl.enableVertexAttribArray(loc.normal);
-        gl.vertexAttribPointer(loc.normal, 3, gl.FLOAT, false, 0, 0);
-      }
-
       gl.uniformMatrix4fv(loc.u_mvp, false, new Float32Array(mMul(vp, matrix)));
-      gl.uniformMatrix3fv(loc.u_normal, false, new Float32Array(mNormal(matrix)));
-      gl.uniform1f(loc.u_unlit, lines ? 1 : 0);
-      gl.drawArrays(lines ? mode : gl.TRIANGLES, 0, mesh.count);
+      gl.drawArrays(mode, 0, mesh.count);
     }
 
     /** 用动态缓冲绘制线段。 */
-    lines(data, vp, mode) {
+    lines(data, vp, mode = this.gl.LINES) {
       const gl = this.gl;
       for (const n of ['position', 'color']) {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.dynamic[n]);
         gl.bufferData(gl.ARRAY_BUFFER, data[n + 's'], gl.DYNAMIC_DRAW);
       }
       this.dynamic.count = data.positions.length / 3;
-      this.draw(this.dynamic, mIdentity(), vp, true, mode);
+      this.draw(this.dynamic, mIdentity(), vp, mode);
     }
 
     /** 绘制网格、模型、辅助轴和轨迹。 */
@@ -172,7 +159,7 @@
       const vp = mMul(projection, view);
       const center = mPoint(matrix, [0, 0, 0]);
 
-      if (options.grid) this.draw(this.grid, mIdentity(), vp, true);
+      if (options.grid) this.draw(this.grid, mIdentity(), vp, gl.LINES);
       if (this.modelMesh) this.draw(this.modelMesh, matrix, vp);
 
       const lines = [];
